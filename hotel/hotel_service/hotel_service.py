@@ -1,51 +1,49 @@
 from hotel_utils.hotel_utils import hash_password,verify_password
 from sqlalchemy.future import select
 from fastapi import HTTPException, status
-from hotel_models.hotel_models import drive_model,update_location_model
-from hotel_sechema.hotel_sechema import driver_details
+from hotel_models.hotel_models import hotel_model,update_location_model,category_model,food_item_model
+from hotel_schema.hotel_schema import hotel_details,category_details,food_item_details
 
-class driver_service:
+class Hotelservice:
     def __init__(self, db):
         self.db = db
     
-    async def create_driver(self, driver: drive_model) -> driver_details:
+    async def create_hotel(self, hotel: hotel_model) -> hotel_details:
         result = await self.db.execute(
-            select(driver_details).where(
-                driver_details.driver_email == driver.driver_email
+            select(hotel_details).where(
+                hotel_details.hotel_email == hotel.hotel_email
             )
         )
         user = result.scalar_one_or_none()
         if user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Driver with this email already exists"
+                detail="Hotel with this email already exists"
             )
-        if driver.driver_password != driver.driver_password_confirm:
+        if hotel.hotel_password != hotel.hotel_password_confirm:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Password and Confirm Password do not match"
             )
-        driver_password = hash_password(driver.driver_password)
-        new_driver = driver_details(
-            driver_name=driver.driver_name,
-            drive_bike_no=driver.drive_bike_no,
-            drive_license_no=driver.drive_license_no,
-            drive_phone_no=driver.drive_phone_no,
-            driver_email=driver.driver_email,
-            drive_password=driver_password,  
-            drive_address=driver.drive_address,
-            driver_lan=driver.driver_lan,
-            driver_long=driver.driver_long,
-            driver_rating=0.0
+        hotel_password = hash_password(hotel.hotel_password)
+        new_hotel = hotel_details(
+            hotel_name=hotel.hotel_name,
+            hotel_phone_no=hotel.hotel_phone_no,
+            hotel_email=hotel.hotel_email,
+            hotel_password=hotel_password,  
+            hotel_address=hotel.hotel_address,
+            hotel_lat=hotel.hotel_lat,
+            hotel_long=hotel.hotel_long,
+            hotel_rating=0.0
         )
-        self.db.add(new_driver)
+        self.db.add(new_hotel)
         await self.db.commit()
-        await self.db.refresh(new_driver)
-        return new_driver
+        await self.db.refresh(new_hotel)
+        return new_hotel
 
-    async def driver_login(self, email: str, password: str) -> driver_details:
+    async def hotel_login(self, email: str, password: str) -> hotel_details:
         result = await self.db.execute(
-            select(driver_details).where(driver_details.driver_email == email)
+            select(hotel_details).where(hotel_details.hotel_email == email)
         )
         user = result.scalar_one_or_none()
         
@@ -55,7 +53,7 @@ class driver_service:
                 detail="Invalid email or password"
             )
         
-        is_valid = verify_password(password, user.drive_password)
+        is_valid = verify_password(password, user.hotel_password)
         if not is_valid:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -64,16 +62,58 @@ class driver_service:
         
         return user
     async def update_location_(self, email: str, location:update_location_model):
-        user= await self.db.execute(select(driver_details).where(driver_details.driver_email==email))
-        driver=user.scalar_one_or_none()
-        if not driver:
+        user= await self.db.execute(select(hotel_details).where(hotel_details.hotel_email==email))
+        hotel=user.scalar_one_or_none()
+        if not hotel:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Driver not found"
             )
-        driver.driver_lan=location.driver_lan
-        driver.driver_long=location.driver_long
-        driver.driver_status=True
+        hotel.hotel_lat=location.hotel_lat
+        hotel.hotel_long=location.hotel_long
+        hotel.hotel_status=True
         await self.db.commit()
-        await self.db.refresh(driver)
-        return driver
+        await self.db.refresh(hotel)
+        return hotel
+    
+
+    async def create_cat(self,data:category_model):
+        check_hotel_id=await self.db.scalar(select(hotel_details).where(hotel_details.id==data.hotel_id))
+        if not check_hotel_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid hotel_id')
+        category=await self.db.scalar(select(category_details).where(category_details.category_name==data.category_name))
+        if category:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='The Category name was already in ')
+        category_new=category_details(
+            hotel_id=data.hotel_id,
+            category_name=data.category_name,
+            category_description=data.category_description
+        )
+
+        self.db.add(category_new)
+        await self.db.commit()
+        await self.db.refresh(category_new)
+
+        return category_new
+    
+    async def create_foods(self,data:dict):
+        check_category_id=await self.db.scalar(select(category_details).where(category_details.id==data.category_id))
+        if not check_category_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid category_id')
+        food=await self.db.scalar(select(food_item_details).where(food_item_details.item_name==data.item_name,
+                                                                  food_item_details.category_id==data.category_id))
+        if  food:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='The food_name already in')
+        
+        new_food_item=food_item_details(
+            category_id=data.category_id,
+             hotel_id=check_category_id.hotel_id,
+             item_name=data.item_name,
+             item_description=data.item_description,
+             item_price=data.item_price
+
+        )
+        self.db.add(new_food_item)
+        await self.db.commit()
+        await self.db.refresh(new_food_item)
+        return new_food_item

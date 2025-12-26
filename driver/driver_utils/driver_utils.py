@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 from fastapi import Depends,HTTPException,status
 from database import get_db
 from sqlalchemy.future import select
-from driver_sechama.driver_sechema import driver_details
+from driver_schema.driver_sechema import driver_details
 SECRET_KEY="your-secret-key-here-change-this-in-production"
 ALGORITHM="HS256"
 min_token=10

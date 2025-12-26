@@ -2,7 +2,7 @@ from driver_utils.driver_utils import hash_password,verify_password
 from sqlalchemy.future import select
 from fastapi import HTTPException, status
 from driver_models.driver_model import drive_model,update_location_model
-from driver_sechama.driver_sechema import driver_details
+from driver_schema.driver_sechema import driver_details
 
 class driver_service:
     def __init__(self, db):
@@ -28,13 +28,13 @@ class driver_service:
         driver_password = hash_password(driver.driver_password)
         new_driver = driver_details(
             driver_name=driver.driver_name,
-            drive_bike_no=driver.drive_bike_no,
-            drive_license_no=driver.drive_license_no,
-            drive_phone_no=driver.drive_phone_no,
+            driver_bike_no=driver.driver_bike_no,
+            driver_license_no=driver.driver_license_no,
+            driver_phone_no=driver.driver_phone_no,
             driver_email=driver.driver_email,
-            drive_password=driver_password,  
-            drive_address=driver.drive_address,
-            driver_lan=driver.driver_lan,
+            driver_password=driver_password,  
+            driver_address=driver.driver_address,
+            driver_lat=driver.driver_lat,
             driver_long=driver.driver_long,
             driver_rating=0.0
         )
@@ -55,7 +55,7 @@ class driver_service:
                 detail="Invalid email or password"
             )
         
-        is_valid = verify_password(password, user.drive_password)
+        is_valid = verify_password(password, user.driver_password)
         if not is_valid:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
