@@ -5,12 +5,12 @@ from fastapi.security import OAuth2PasswordBearer
 from fastapi import Depends,HTTPException,status
 from database import get_db
 from sqlalchemy.future import select
-from hotel_sechema.hotel_sechema import hotel_details
+from hotel_schema.hotel_schema import hotel_details
 SECRET_KEY="your-secret-key-here-change-this-in-production"
 ALGORITHM="HS256"
 min_token=10
 refresh_token=1
-oauth=OAuth2PasswordBearer(tokenUrl="driver/login")
+oauth=OAuth2PasswordBearer(tokenUrl="hotel/login")
 pwd_content=CryptContext(schemes=["argon2"],deprecated="auto")
 
 def hash_password(password:str)->str:
@@ -32,12 +32,12 @@ async def get_user(token:str=Depends(oauth),db=Depends(get_db)):
     )
     try:
         payload=jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
-        driver_name:str=payload.get("sub")
-        if driver_name is None:
+        hotel_name:str=payload.get("sub")
+        if hotel_name is None:
             raise credentials_exception
 
     except JWTError:
         raise credentials_exception
-    current_user=await db.execute(select(driver_details).where(driver_details.driver_name==driver_name))
+    current_user=await db.execute(select(hotel_details).where(hotel_details.hotel_name==hotel_name))
     user = current_user.scalar_one_or_none()
     return user
