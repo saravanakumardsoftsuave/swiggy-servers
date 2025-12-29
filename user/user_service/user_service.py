@@ -1,7 +1,7 @@
 from user_utils.user_utils import hash_password,verify_password
 from sqlalchemy.future import select
 from fastapi import HTTPException, status
-from user_models.users_model import user_model,order_model,food_items,update_location_model
+from user_models.users_model import user_model,order_model,food_items,update_location_model,payment_status
 from user_schema.user_schema import user_details,order_items,orders
 from sqlalchemy import text
 class  Userservice:
@@ -71,24 +71,10 @@ class  Userservice:
         await self.db.refresh(user)
         return user
     
-    async def orderitem(self,order:food_items):
-        result=await self.db.execute(text("SELECT 1 FROM food_item_details WHERE id=:hid"),{'hid':order.food_id})
-        if result.scalar() is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid food id')
-        new_orderitem=order_items(
-            order_id=order.order_id,
-            food_id=order.food_id,
-            quantity=order.quantity
-        )
-        self.db.add(new_orderitem)
-        self.db.commit()
-        self.db.refresh(new_orderitem)
-        return new_orderitem
     async def order_create(self,order:order_model):
         result = await self.db.execute(
     text("SELECT 1 FROM hotel_details WHERE id = :hid"),
-    {"hid": order.hotel_id}
-)
+    {"hid": order.hotel_id})
         if result.scalar() is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='invalid')
         user=await self.db.scalar(select(user_details).where(user_details.user_id==order.user_id))
@@ -97,54 +83,66 @@ class  Userservice:
         new_oder=orders(
             user_id=order.user_id,
             hotel_id=order.hotel_id,
-            driver_id=order.driver_id,
-            total_amount=order.total_amount,
+            total_amount=0,
         )
-
         self.db.add(new_oder)
+        await self.db.flush()
+        total_amount=0
+    
+        for items in order.items:
+            food = await self.db.scalar(text("SELECT item_price FROM food_item_details WHERE id =:hid"),
+                                         {'hid':items.food_id})
+            if food is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid food id')
+            card=order_items(
+                order_id=new_oder.id,
+                food_id=items.food_id,
+                quantity=items.quantity
+            )
+            self.db.add(card)
+        
+            total_amount+=food*items.quantity
+
+        new_oder.total_amount=total_amount
+        await self.db.execute(text('UPDATE orders SET order_status = :status where id= :oid'),
+                                  {'status':'Waiting For order confirmation',
+                                   'oid':new_oder.id})
+            
         await self.db.commit()
         await self.db.refresh(new_oder)
-        return new_oder       
-    # async def orderitem(self,order:orderItem):
-    #     result=await self.db.execute(text("SELECT 1 FROM "))
-
-    # async def create_cat(self,data:category_model):
-    #     check_hotel_id=await self.db.scalar(select(hotel_details).where(hotel_details.id==data.hotel_id))
-    #     if not check_hotel_id:
-    #         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid hotel_id')
-    #     category=await self.db.scalar(select(category_details).where(category_details.category_name==data.category_name))
-    #     if category:
-    #         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='The Category name was already in ')
-    #     category_new=category_details(
-    #         hotel_id=data.hotel_id,
-    #         category_name=data.category_name,
-    #         category_description=data.category_description
-    #     )
-
-    #     self.db.add(category_new)
-    #     await self.db.commit()
-    #     await self.db.refresh(category_new)
-
-    #     return category_new
-    
-    # async def create_foods(self,data:dict):
-    #     check_category_id=await self.db.scalar(select(category_details).where(category_details.id==data.category_id))
-    #     if not check_category_id:
-    #         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid category_id')
-    #     food=await self.db.scalar(select(food_item_details).where(food_item_details.item_name==data.item_name,
-    #                                                               food_item_details.category_id==data.category_id))
-    #     if  food:
-    #         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='The food_name already in')
-        
-    #     new_food_item=food_item_details(
-    #         category_id=data.category_id,
-    #          hotel_id=check_category_id.hotel_id,
-    #          item_name=data.item_name,
-    #          item_description=data.item_description,
-    #          item_price=data.item_price
-
-    #     )
-    #     self.db.add(new_food_item)
-    #     await self.db.commit()
-    #     await self.db.refresh(new_food_item)
-    #     return new_food_item
+            
+        return {
+    "order_id": new_oder.id,
+    "user_id": new_oder.user_id,
+    "hotel_id": new_oder.hotel_id,
+    "total_amount": new_oder.total_amount,
+    "items": order.items   }
+     
+    async def payment_status_(self,order_id:int,payment:payment_status):
+        order_status_=await self.db.scalar(select(orders).where(orders.order_status=='order Conformed'))
+        if order_status_:
+            order=await self.db.scalar(select(orders).where(orders.id==order_id))
+            if order is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid order_id')
+            if payment.payment_method=='Online':
+                await self.db.execute(text('UPDATE orders SET payment_status =:status WHERE id =:oid'),
+                                    {
+                                        'status':'PAID',
+                                        'oid':order_id
+                                    })
+                self.db.commit()
+            elif payment.payment_method=='Cash_On_Delivery':
+                await self.db.execute(text('UPDATE orders SET payment_status =:status WHERE id =:oid'),
+                                    {
+                                        'status':'NOT PAID,CASH_ON_DELIVERY',
+                                        'oid':order_id
+                                    })
+                self.db.commit()
+            return {
+                'message':'status updated'
+            }
+        elif not order_status_:
+            return {
+                'message':'Your order still in order conformation'
+            }
+            

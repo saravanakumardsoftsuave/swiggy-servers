@@ -1,6 +1,6 @@
 
 from pydantic import BaseModel
-
+from typing import List,Literal
 class hotel_model(BaseModel):
     hotel_name: str
     hotel_phone_no: int
@@ -25,3 +25,8 @@ class food_item_model(BaseModel):
 class update_location_model(BaseModel):
     hotel_lat: float
     hotel_long: float
+
+class Orderrequest(BaseModel):
+    order_id:int
+    response:Literal['accept','reject']
+    

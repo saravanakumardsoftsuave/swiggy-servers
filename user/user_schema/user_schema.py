@@ -19,27 +19,24 @@ class user_details(base):
 
 class orders(base):
     __tablename__ = 'orders'
-    id=Column(Integer,primary_key=True,index=True)
-    ordeitem_id = Column(Integer, ForeignKey('order_items.id'), nullable=False)
+
+    id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('user_details.user_id'), nullable=False)
-    hotel_id = Column(Integer,  nullable=False)
+    hotel_id = Column(Integer, nullable=False)
     order_status = Column(String, default="INITIAL")
+    payment_status=Column(String,default='NOT PAID')
+    driver_name=Column(String,default="None")
     total_amount = Column(Float, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    created_at = Column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        nullable=False
-    )
-
+    order_items = relationship("order_items", back_populates="order")
     user = relationship("user_details", back_populates="orders")
-    order_items = relationship("order_items",back_populates="order")
 
 class order_items(base):
     __tablename__ = 'order_items'
     id=Column(Integer,primary_key=True,index=True)
-    order_id = Column(Integer, nullable=True)
-    food_id = Column(Integer, ForeignKey('food_item_details.id'), nullable=False)
+    order_id = Column(Integer, ForeignKey('orders.id'),nullable=True)
+    food_id = Column(Integer, nullable=False)
     quantity = Column(Integer, nullable=False)
 
     order = relationship("orders", back_populates="order_items")

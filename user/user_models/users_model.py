@@ -1,6 +1,6 @@
 
 from pydantic import BaseModel
-from typing import List
+from typing import List,Literal
 class user_model(BaseModel):
     user_name :str
     user_phone_no:int
@@ -11,18 +11,16 @@ class user_model(BaseModel):
     user_lat :float
     user_long :float
 class food_items(BaseModel):
-    order_id:int
     food_id:int
     quantity:int
 
 class order_model(BaseModel):
-    order_id:int
     user_id :int
     hotel_id :int 
     items:list[food_items]
-    total_amount:int
 
-
+class payment_status(BaseModel):
+    payment_method:Literal['Online','Cash_On_Delivery']
 
 
 class update_location_model(BaseModel):

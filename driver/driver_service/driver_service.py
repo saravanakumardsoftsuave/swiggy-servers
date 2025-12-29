@@ -1,9 +1,9 @@
 from driver_utils.driver_utils import hash_password,verify_password
 from sqlalchemy.future import select
 from fastapi import HTTPException, status
-from driver_models.driver_model import drive_model,update_location_model
+from driver_models.driver_model import drive_model,update_location_model,orderrequest
 from driver_schema.driver_sechema import driver_details
-
+from sqlalchemy import text
 class driver_service:
     def __init__(self, db):
         self.db = db
@@ -77,3 +77,102 @@ class driver_service:
         await self.db.commit()
         await self.db.refresh(driver)
         return driver
+    
+    async def Orderrequest(self,driver_id:int,order:orderrequest):
+        order_status_=await self.db.scalar(text('SELECT order_status from orders where id= :oid'),
+                                        {'oid':order.order_id})
+        if order_status_!='Waiting For order confirmation':
+                access=await self.db.scalar(text('SELECT driver_name FROM orders WHERE id  =:oid'),
+                                                {
+                                                    'oid':order.order_id
+                                                })
+                if access == 'None':
+                    driver_name=await self.db.scalar(
+                    select(driver_details).where(driver_details.id == driver_id)
+                )
+                    if driver_name is None:
+                        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid driver_id')
+                
+                    await self.db.execute(text('UPDATE orders SET driver_name  =:name where id =:oid'),
+                                            {'name':driver_name.driver_name,
+                                            'oid':order.order_id})
+                    if order.response=='Accept':
+                        hotelid=await self.db.execute(text('SELECT hotel_lat,hotel_long FROM hotel_details WHERE id= :hid'),
+                                                        {'hid':order.hotel_id})
+                        order_=await self.db.execute(text('SELECT food_id, quantity FROM order_items WHERE id= :oid'),
+                                                    {
+                                                        'oid':order.order_id
+                                                    })
+                        userid=await self.db.execute(text('SELECT user_lat,user_long FROM user_details WHERE user_id= :uid'),
+                                                        {'uid':order.user_id}) 
+                        total_amt=await self.db.execute(text('SELECT total_amount FROM orders WHERE id= :uid'),
+                                                        {'uid':order.order_id})
+                        if hotelid is None:
+                            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid Hotel_id')
+                        if userid is None:
+                            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid user_id')
+                        
+
+                        orders=order_.all()
+                        items=[]
+                        for item in orders:
+                            food_name=await self.db.scalar(text('SELECT item_name FROM food_item_details WHERE id = :fid'),{'fid':item.food_id})
+                            items.append({
+                                'food_name':food_name,
+                                'quantity':item.quantity
+                            })
+
+                        hotel_locations=hotelid.all()
+                        hotel_location=[]
+                        for loc in hotel_locations:
+                            hotel_location.append({
+                                'hotel_lat':loc.hotel_lat,
+                                'hotel_long':loc.hotel_long
+                            })
+
+                        user_locations=userid.all()
+                        user_location=[]
+                        for locs in user_locations:
+                            user_location.append({
+                                'hotel_lat':locs.user_lat,
+                                'hotel_long':locs.user_long
+                            })
+                        status=await self.db.execute(text('UPDATE orders SET order_status = :status where id= :oid'),
+                                            {'status':'DRIVER ASSIGNED',
+                                            'oid':order.order_id})
+                        
+                        return {
+                                    'order_id':order.order_id,
+                                    'hotel_id':order.hotel_id,
+                                    'user_id':order.user_id,
+                                    'hotel_location':hotel_location,
+                                    'user_location':user_location,
+                                    'orderitems':items,
+                                    'total_amount':total_amt
+                                }
+                    else:
+                        return {'message':'Your order point will lose'}
+                else:
+                    return {'message':'Order already took'}
+        else:
+            return {'message': 'Waiting For order confirmation' }
+    async def update_status(self,status_driver:update_status):
+        status_=await  self.db.execute(text('UPDATE orders SET order_status= :status WHERE id= :oid'),
+                                    {'status':status_driver.current_status,
+                                    'oid':status_driver.order_id})
+        if status_ is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invald order_id')
+        payment_status=await self.db.execute(text('SELECT payment_status FROM order_items WHERE order_id= :oid'),
+                                            {
+                                                'oid':status_driver.order_id
+                                            })
+        if payment_status=='NOT PAID,CASH_ON_DELIVERY' and status_driver=='DELIVERIED':
+            await  self.db.execute(text('UPDATE orders SET Ppayment_status= :status WHERE id= :oid'),
+                                    {'status':'PAID',
+                                    'oid':status_driver.order_id})
+        elif payment_status=='PAID' and status_driver=='DELIVERIED':
+            return{'message':'order completed!!!'}
+        return {
+            'message':'Your order status Updated!!!'
+        }
+    

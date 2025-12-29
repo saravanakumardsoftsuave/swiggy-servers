@@ -1,5 +1,5 @@
 from fastapi import APIRouter,Depends,HTTPException,status
-from driver_models.driver_model import drive_model,update_location_model
+from driver_models.driver_model import drive_model,update_location_model,orderrequest,update_status
 from database import get_db
 from driver_service.driver_service import driver_service
 from fastapi.security import OAuth2PasswordRequestForm
@@ -39,11 +39,14 @@ async def update_location_(email:str,location: update_location_model, db=Depends
     await location_data.update_location_(email, location)
     return {"message": "Location updated successfully"}
 
-@driver_route.get('/request_ride')
-async def request_ride():
-    pass
+@driver_route.post('/request_ride')
+async def request_ride(driver_id:int,order:orderrequest,db=Depends(get_db)):
+    result=driver_service(db)
+    return await result.Orderrequest(driver_id,order)
+
 
 
 @driver_route.put('/update_status')
-async def update_status():
-    pass
+async def update_status(status_driver:update_status,db=Depends(get_db)):
+     result=driver_service(db)
+     return await result.update_status(status_driver)
