@@ -1,6 +1,6 @@
 
 from pydantic import BaseModel
-
+from typing import Literal
 class drive_model(BaseModel):
     driver_name: str
     driver_bike_no: str
@@ -17,3 +17,13 @@ class drive_model(BaseModel):
 class update_location_model(BaseModel):
     driver_lan: float
     driver_long: float
+
+class orderrequest(BaseModel):
+    response:Literal['Accept','reject']
+    order_id:int
+    hotel_id:int
+    user_id:int
+    
+class update_status(BaseModel):
+    order_id:int
+    current_status:str

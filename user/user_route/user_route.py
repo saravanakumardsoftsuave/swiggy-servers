@@ -1,5 +1,5 @@
 from fastapi import APIRouter,Depends,HTTPException,status
-from user_models.users_model import user_model,order_model,food_items,update_location_model
+from user_models.users_model import user_model,order_model,food_items,update_location_model,payment_status
 from database import get_db
 from user_schema.user_schema import user_details,order_items,orders
 from user_service.user_service import Userservice
@@ -40,31 +40,13 @@ async def update_location_(email:str,location: update_location_model, db=Depends
     await location_data.update_location_(email, location)
     return {"message": "Location updated successfully"}
 
-@user_route.post('/orderitem')
-async def orders_(order:food_items,db=Depends(get_db)):
+@user_route.post('/ordering')
+async def orders_(order:order_model,db=Depends(get_db)):
      orders=Userservice(db)
-     await orders.orderitem(order)
-     return {
-          'message':'created'
-     }
-# @user_route.post('/category')
-# async def  create_category(data:category_model,db=Depends(get_db)):
-#     category=Hotelservice(db)
-#     category_=await category.create_cat(data)
-#     return {
-#          'message':'category created',
-#          'category_name':category_.category_name
-#     }
+     orderr=await orders.order_create(order)
+     return orderr
 
-# @user_route.post('/food_item')
-# async def food_items(data:food_item_model,db=Depends(get_db)):
-#      food_item=Hotelservice(db)
-#      food_item_=await food_item.create_foods(data)
-#      return{
-#           'message':'food created',
-#           'food_name':food_item_.item_name
-#      }
-
-# @user_route.put('/update_status')
-# async def update_status():
-#     pass
+@user_route.put('/update_status')
+async def update_payment_status(order_id:int,payment:payment_status,db=Depends(get_db),auth=Depends((get_user))):
+    result=Userservice(db)
+    return await result.payment_status_(order_id,payment)

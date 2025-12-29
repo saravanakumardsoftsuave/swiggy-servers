@@ -1,9 +1,9 @@
 from hotel_utils.hotel_utils import hash_password,verify_password
 from sqlalchemy.future import select
 from fastapi import HTTPException, status
-from hotel_models.hotel_models import hotel_model,update_location_model,category_model,food_item_model
+from hotel_models.hotel_models import hotel_model,update_location_model,category_model,food_item_model,Orderrequest
 from hotel_schema.hotel_schema import hotel_details,category_details,food_item_details
-
+from sqlalchemy import text
 class Hotelservice:
     def __init__(self, db):
         self.db = db
@@ -117,3 +117,36 @@ class Hotelservice:
         await self.db.commit()
         await self.db.refresh(new_food_item)
         return new_food_item
+    async def orders(self,order:Orderrequest):
+        if  order.response=='accept':
+            orders=await self.db.scalar(text('SELECT total_amount from orders where id= :oid'),
+                                        {'oid':order.order_id})
+            if orders is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid order id')
+            orderitems=await self.db.execute(text("SELECT food_id,quantity FROM order_items WHERE order_id= :oid"),
+                                           {'oid':order.order_id})
+            await self.db.execute(text('UPDATE orders SET order_status = :status where id= :oid'),
+                                  {'status':'order Conformed',
+                                   'oid':order.order_id})
+            
+            orderitem=orderitems.all()
+            item=[]
+            for itm in orderitem:
+                food_name=await self.db.scalar(text('SELECT item_name from food_item_details WHERE id= :fid'),
+                                               {'fid':itm.food_id})
+                if food_name:
+                    item.append({
+                    'food_name':food_name,
+                    'food_id':itm.food_id,
+                    'quantity':itm.quantity
+                })
+
+            if orderitem is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid orderitem')
+            return{
+                'order_id':order.order_id,
+                'orderitems':item,
+                'total_amount':orders
+            }
+        else:
+            return {'message':'order cancelled'}
