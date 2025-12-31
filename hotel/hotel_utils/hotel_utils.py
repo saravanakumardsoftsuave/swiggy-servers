@@ -8,7 +8,7 @@ from sqlalchemy.future import select
 from hotel_schema.hotel_schema import hotel_details
 SECRET_KEY="your-secret-key-here-change-this-in-production"
 ALGORITHM="HS256"
-min_token=10
+min_token=100
 refresh_token=1
 oauth=OAuth2PasswordBearer(tokenUrl="hotel/login")
 pwd_content=CryptContext(schemes=["argon2"],deprecated="auto")

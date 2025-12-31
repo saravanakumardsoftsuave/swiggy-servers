@@ -14,7 +14,7 @@ class user_details(base):
     user_address = Column(String, nullable=False)
     user_lat = Column(Float, nullable=False)
     user_long = Column(Float, nullable=False)
-
+    user_delete=Column(Boolean,default=False,nullable=False)
     orders = relationship("orders", back_populates="user")
 
 class orders(base):

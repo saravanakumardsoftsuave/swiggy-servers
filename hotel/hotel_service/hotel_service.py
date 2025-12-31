@@ -1,6 +1,6 @@
-from hotel_utils.hotel_utils import hash_password,verify_password
+from hotel_utils.hotel_utils import hash_password,verify_password,get_user
 from sqlalchemy.future import select
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status,Depends
 from hotel_models.hotel_models import hotel_model,update_location_model,category_model,food_item_model,Orderrequest
 from hotel_schema.hotel_schema import hotel_details,category_details,food_item_details
 from sqlalchemy import text
@@ -43,7 +43,7 @@ class Hotelservice:
 
     async def hotel_login(self, email: str, password: str) -> hotel_details:
         result = await self.db.execute(
-            select(hotel_details).where(hotel_details.hotel_email == email)
+            select(hotel_details).where(hotel_details.hotel_email == email,hotel_details.hotel_delete == False)
         )
         user = result.scalar_one_or_none()
         
@@ -61,9 +61,9 @@ class Hotelservice:
             )
         
         return user
-    async def update_location_(self, email: str, location:update_location_model):
-        user= await self.db.execute(select(hotel_details).where(hotel_details.hotel_email==email))
-        hotel=user.scalar_one_or_none()
+    async def update_location_(self, location:update_location_model,user=Depends(get_user)):
+        use_r= await self.db.execute(select(hotel_details).where(hotel_details.hotel_name==user.hotel_name,hotel_details.hotel_delete == False))
+        hotel=use_r.scalar_one_or_none()
         if not hotel:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -77,12 +77,19 @@ class Hotelservice:
         return hotel
     
 
-    async def create_cat(self,data:category_model):
+    async def create_cat(self,data:category_model,user=Depends(get_user)):
+        use_r= await self.db.execute(select(hotel_details).where(hotel_details.hotel_name==user.hotel_name,hotel_details.hotel_delete == False))
+        hotel=use_r.scalar_one_or_none()
+        if not hotel:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Driver not found"
+            )
         check_hotel_id=await self.db.scalar(select(hotel_details).where(hotel_details.id==data.hotel_id))
         if not check_hotel_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid hotel_id')
-        category=await self.db.scalar(select(category_details).where(category_details.category_name==data.category_name))
-        if category:
+        category=await self.db.scalar(select(category_details).where(category_details.category_name==data.category_name,category_details.hotel_id == data.hotel_id))
+        if category and check_hotel_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='The Category name was already in ')
         category_new=category_details(
             hotel_id=data.hotel_id,
@@ -96,7 +103,14 @@ class Hotelservice:
 
         return category_new
     
-    async def create_foods(self,data:dict):
+    async def create_foods(self,data:dict,user=Depends(get_user)):
+        use_r= await self.db.execute(select(hotel_details).where(hotel_details.hotel_name==user.hotel_name,hotel_details.hotel_delete == False))
+        hotel=use_r.scalar_one_or_none()
+        if not hotel:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Driver not found"
+            )
         check_category_id=await self.db.scalar(select(category_details).where(category_details.id==data.category_id))
         if not check_category_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid category_id')
@@ -117,7 +131,14 @@ class Hotelservice:
         await self.db.commit()
         await self.db.refresh(new_food_item)
         return new_food_item
-    async def orders(self,order:Orderrequest):
+    async def orders(self,order:Orderrequest,user=Depends(get_user)):
+        use_r= await self.db.execute(select(hotel_details).where(hotel_details.hotel_name==user.hotel_name,hotel_details.hotel_delete == False))
+        hotel=use_r.scalar_one_or_none()
+        if not hotel:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Driver not found"
+            )
         if  order.response=='accept':
             orders=await self.db.scalar(text('SELECT total_amount from orders where id= :oid'),
                                         {'oid':order.order_id})
@@ -150,3 +171,13 @@ class Hotelservice:
             }
         else:
             return {'message':'order cancelled'}
+    async def delete_user(self,user=Depends(get_user)):
+        delt= await self.db.scalar(select(hotel_details).where(hotel_details.hotel_name==user.hotel_name,hotel_details.hotel_delete == False))
+        if not delt:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid user')
+        delt.hotel_delete=True
+        self.db.commit()
+        return {
+            "hotel_id":delt.id,
+            'message':'driver account deleted'
+        }

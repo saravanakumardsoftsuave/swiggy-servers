@@ -8,7 +8,7 @@ from sqlalchemy.future import select
 from driver_schema.driver_sechema import driver_details
 SECRET_KEY="your-secret-key-here-change-this-in-production"
 ALGORITHM="HS256"
-min_token=10
+min_token=100
 refresh_token=1
 oauth=OAuth2PasswordBearer(tokenUrl="driver/login")
 pwd_content=CryptContext(schemes=["argon2"],deprecated="auto")

@@ -8,11 +8,13 @@ from user_utils.user_utils import token,get_user
 user_route=APIRouter(prefix='/user',tags=['USER'])
 
 
-@user_route.post('/signup')
-async def user_singup(hotel:user_model, db=Depends(get_db)):
+@user_route.post('/signup',status_code=status.HTTP_201_CREATED)
+async def user_singup(user:user_model, db=Depends(get_db)):
     service = Userservice(db)
-    await service.user_create(hotel)
-    return {"message":"user created successfully"}
+    new_user=await service.user_create(user)
+    return {
+         'user_id':new_user.user_id,
+         "message":"user created successfully"}
 
 @user_route.post('/login')
 async def  user_login_(
@@ -30,23 +32,27 @@ async def  user_login_(
             "driver_name": user.user_name
         }
 
-@user_route.get('/current_hotel')
-async def current_hotel(user=Depends(get_user)):
+@user_route.get('/currentUser')
+async def current_user(user=Depends(get_user)):
      return {"user_name": user.user_name}
     
 @user_route.put('/update_location')
-async def update_location_(email:str,location: update_location_model, db=Depends(get_db)):
+async def update_location_(location: update_location_model, db=Depends(get_db),auth=Depends(get_user)):
     location_data = Userservice(db)
-    await location_data.update_location_(email, location)
+    await location_data.update_location_( location,auth)
     return {"message": "Location updated successfully"}
 
 @user_route.post('/ordering')
-async def orders_(order:order_model,db=Depends(get_db)):
+async def orders_(order:order_model,db=Depends(get_db),auth=Depends((get_user))):
      orders=Userservice(db)
-     orderr=await orders.order_create(order)
+     orderr=await orders.order_create(order,auth)
      return orderr
 
-@user_route.put('/update_status')
+@user_route.put('/update_order_status')
 async def update_payment_status(order_id:int,payment:payment_status,db=Depends(get_db),auth=Depends((get_user))):
     result=Userservice(db)
-    return await result.payment_status_(order_id,payment)
+    return await result.payment_status_(order_id,payment,auth)
+
+async def delete_driver(db=Depends(get_db),user=Depends(get_user)):
+     result=Userservice(db)
+     return await result.delete_user(user)

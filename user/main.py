@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 app = FastAPI(
-    title="Hotel Service",
+    title="USER Service",
     lifespan=lifespan
 )
 
