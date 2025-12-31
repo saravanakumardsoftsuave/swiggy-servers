@@ -1,9 +1,10 @@
 from user_utils.user_utils import hash_password,verify_password
 from sqlalchemy.future import select
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status,Depends
 from user_models.users_model import user_model,order_model,food_items,update_location_model,payment_status
 from user_schema.user_schema import user_details,order_items,orders
 from sqlalchemy import text
+from user_utils.user_utils import get_user
 class  Userservice:
     def __init__(self, db):
         self.db = db
@@ -41,7 +42,7 @@ class  Userservice:
 
     async def user_login(self, email: str, password: str) -> user_details:
         user = await self.db.scalar(
-            select(user_details).where(user_details.user_email == email)
+            select(user_details).where(user_details.user_email == email,user_details.user_delete == False)
         )
         
         if not user:
@@ -58,8 +59,8 @@ class  Userservice:
             )
         
         return user
-    async def update_location_(self, email: str, location:update_location_model):
-        user= await self.db.scalar(select(user_details).where(user_details.user_email==email))
+    async def update_location_(self,location:update_location_model,auth=Depends(get_user)):
+        user= await self.db.scalar(select(user_details).where((user_details.user_name==auth.user_name)&(user_details.user_delete == False)))
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -71,7 +72,17 @@ class  Userservice:
         await self.db.refresh(user)
         return user
     
-    async def order_create(self,order:order_model):
+    async def order_create(self,order:order_model,auth=Depends(get_user)):
+        user= await self.db.scalar(select(user_details).where((user_details.user_name==auth.user_name)&(user_details.user_delete == False)))
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Driver not found"
+            )
+        hotel_find=await self.db.scalar(text("SELECT hotel_delete FROM hotel_details WHERE id =:hid"),
+                                         {'hid':order.hotel_id})
+        if hotel_find:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Hotel id was already deleted')
         result = await self.db.execute(
     text("SELECT 1 FROM hotel_details WHERE id = :hid"),
     {"hid": order.hotel_id})
@@ -118,7 +129,13 @@ class  Userservice:
     "total_amount": new_oder.total_amount,
     "items": order.items   }
      
-    async def payment_status_(self,order_id:int,payment:payment_status):
+    async def payment_status_(self,order_id:int,payment:payment_status,auth=Depends(get_user)):
+        user= await self.db.scalar(select(user_details).where(user_details.user_name==auth.user_name,user_details.user_delete == False))
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Driver not found"
+            )
         order_status_=await self.db.scalar(select(orders).where(orders.order_status=='order Conformed'))
         if order_status_:
             order=await self.db.scalar(select(orders).where(orders.id==order_id))
@@ -145,4 +162,13 @@ class  Userservice:
             return {
                 'message':'Your order still in order conformation'
             }
-            
+    async def delete_user(self,user=Depends(get_user)):
+        delt= await self.db.scalar(select(user_details).where(user_details.user_name==user.user_name,user_details.user_delete == False))
+        if not delt:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Invalid user')
+        delt.user_delete=True
+        self.db.commit()
+        return {
+            "user_id":delt.id,
+            'message':'driver account deleted'
+        }

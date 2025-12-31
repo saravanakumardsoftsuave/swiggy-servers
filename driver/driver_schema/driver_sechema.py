@@ -18,7 +18,7 @@ class driver_details(base):
     driver_long = Column(Float, nullable=False)
     driver_rating = Column(Float, default=0.0)
     driver_status = Column(Boolean, default=False)
-
+    driver_delete=Column(Boolean,default=False,nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

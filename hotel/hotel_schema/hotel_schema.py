@@ -16,7 +16,7 @@ class hotel_details(base):
     hotel_long = Column(Float, nullable=False)
     hotel_rating = Column(Float, default=0.0)
     hotel_status = Column(Boolean, default=False)
-
+    hotel_delete=Column(Boolean,default=False,nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -46,6 +46,6 @@ class food_item_details(base):
     item_price = Column(Float, nullable=False)
     hotel_id = Column(Integer, ForeignKey('hotel_details.id'), nullable=False)
     category_id = Column(Integer, ForeignKey('category_details.id'), nullable=False)
-
+    
     category = relationship("category_details", back_populates="food_items")
     hotel = relationship("hotel_details", back_populates="food_items")
