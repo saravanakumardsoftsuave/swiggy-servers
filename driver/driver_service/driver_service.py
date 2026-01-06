@@ -2,9 +2,16 @@ from driver_utils.driver_utils import hash_password,verify_password,get_user
 from fastapi import Depends
 from sqlalchemy.future import select
 from fastapi import HTTPException, status
-from driver_models.driver_model import drive_model,update_location_model,orderrequest
+from driver_models.driver_model import drive_model,update_location_model,orderrequest,send_email
 from driver_schema.driver_sechema import driver_details
 from sqlalchemy import text
+import smtplib
+from email.mime.text import MIMEText
+import os
+from dotenv import load_dotenv
+
+
+
 class driver_service:
     def __init__(self, db):
         self.db = db
@@ -174,19 +181,20 @@ class driver_service:
     async def update_status(self,status_driver:update_status,user=Depends(get_user)):
         driver_user= await self.db.execute(select(driver_details).where(driver_details.driver_name==user.driver_name,driver_details.driver_delete == False))
         driver=driver_user.scalar_one_or_none()
+        
         if not driver:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Driver not found"
             )
-        
+        current_email=driver.driver_email 
         ord_status=await self.db.scalar(text('SELECT order_status FROM orders WHERE id  =:oid'),
                                             {
                                                 'oid':status_driver.order_id
                                             })
         if (ord_status=='ORDER DELIVERIED' and status_driver.current_status!='ORDER DELIVERIED') or ord_status=='ORDER DELIVERIED':
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,detail='THE ORDER AREADY COMPLETED?')
-        if ord_status=='ON THE WAY' and status_driver.current_status=='ORDER PICKED' or ord_status=='ON THE WAY':
+        if ord_status=='ON THE WAY' and status_driver.current_status=='ORDER PICKED':
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,detail='THE ORDER AREADY ON THE WAY?')
         if ord_status=='ORDER PICKED' and status_driver.current_status=='ORDER PICKED':
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,detail='THE ORDER AREADY PICKED?')
@@ -214,11 +222,35 @@ class driver_service:
             await  self.db.execute(text('UPDATE orders SET payment_status= :status WHERE id= :oid'),
                                     {'status':'PAID',
                                     'oid':status_driver.order_id})
-            return {
-            'message':'AMOUNT PAID AND ORDER DELIVERIED!!!'
-        }
+            msg=MIMEText(os.getenv('body'))
+            msg["Subject"] = os.getenv('Subject')
+            msg["From"] = os.getenv('SENDER_EMAIL')
+            msg["To"] =current_email
+
+            try:
+                server = smtplib.SMTP(os.getenv('server_name'), int(os.getenv('server_port')))
+                server.starttls()
+                server.login(os.getenv('SENDER_EMAIL'), os.getenv( 'APP_PASSWORD'))
+                server.sendmail(os.getenv('SENDER_EMAIL'),os.getenv('receiver_email'), msg.as_string())
+                server.quit()
+                return {"status": "Email sent successfully!"}
+            except Exception as e:
+                return {"status": "Error sending email", "detail": str(e)}  
         elif payment_status=='PAID' and status_driver.current_status=='ORDER DELIVERIED':
-            return{'message':'order completed!!!'}
+            msg=MIMEText(os.getenv('body'))
+            msg["Subject"] = os.getenv('Subject')
+            msg["From"] = os.getenv('SENDER_EMAIL')
+            msg["To"] =current_email
+
+            try:
+                server = smtplib.SMTP(os.getenv('server_name'), int(os.getenv('server_port')))
+                server.starttls()
+                server.login(os.getenv('SENDER_EMAIL'), os.getenv( 'APP_PASSWORD'))
+                server.sendmail(os.getenv('SENDER_EMAIL'),os.getenv('receiver_email'), msg.as_string())
+                server.quit()
+                return {"status": "Email sent successfully!"}
+            except Exception as e:
+                return {"status": "Error sending email", "detail": str(e)}
         return {
             'message':'Your order status Updated!!!'
         }
@@ -232,4 +264,19 @@ class driver_service:
             "driver_id":delt.id,
             'message':'driver account deleted'
         }
+    
+    async def mail():
+        msg=MIMEText(os.getenv('body'))
+        msg["Subject"] = os.getenv('Subject')
+        msg["From"] = os.getenv('SENDER_EMAIL')
+        msg["To"] = os.getenv('receiver_email')
 
+        try:
+            server = smtplib.SMTP(os.getenv('server_name'), int(os.getenv('server_port')))
+            server.starttls()
+            server.login(os.getenv('SENDER_EMAIL'), os.getenv( 'APP_PASSWORD'))
+            server.sendmail(os.getenv('SENDER_EMAIL'),os.getenv('receiver_email'), msg.as_string())
+            server.quit()
+            return {"status": "Email sent successfully!"}
+        except Exception as e:
+            return {"status": "Error sending email", "detail": str(e)}

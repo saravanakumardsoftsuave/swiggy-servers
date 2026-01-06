@@ -9,3 +9,6 @@ python-dotenv
 pydantic
 alembic
 asyncpg
+fastapi
+fastapi-mail
+python-dotenv

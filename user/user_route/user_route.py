@@ -48,7 +48,7 @@ async def orders_(order:order_model,db=Depends(get_db),auth=Depends((get_user)))
      orderr=await orders.order_create(order,auth)
      return orderr
 
-@user_route.put('/update_order_status')
+@user_route.put('/update_order_status/{order_id}')
 async def update_payment_status(order_id:int,payment:payment_status,db=Depends(get_db),auth=Depends((get_user))):
     result=Userservice(db)
     return await result.payment_status_(order_id,payment,auth)

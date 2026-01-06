@@ -1,5 +1,5 @@
 from fastapi import APIRouter,Depends,HTTPException,status
-from hotel_models.hotel_models import hotel_model,update_location_model,category_model,food_item_model,Orderrequest
+from hotel_models.hotel_models import hotel_model,update_location_model,category_model,food_item_model,Orderrequest,update_pass
 from database import get_db
 from hotel_service.hotel_service import Hotelservice
 from fastapi.security import OAuth2PasswordRequestForm
@@ -65,6 +65,12 @@ async def orderrequest(order:Orderrequest,db=Depends(get_db),user=Depends(get_us
     result=Hotelservice(db)
     return await result.orders(order,user)
 
+@hotel_route.delete('/deletehotel')
 async def delete_driver(db=Depends(get_db),user=Depends(get_user)):
      result=Hotelservice(db)
      return await result.delete_user(user)
+
+@hotel_route.put('/updatepass')
+async def updatepass(updatepass:update_pass,db=Depends(get_db)):
+     res=Hotelservice(db)
+     return await res.updatePass(updatepass)
