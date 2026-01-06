@@ -1,5 +1,5 @@
 from fastapi import APIRouter,Depends,HTTPException,status
-from driver_models.driver_model import drive_model,update_location_model,orderrequest,update_status
+from driver_models.driver_model import drive_model,update_location_model,orderrequest,update_status,send_email
 from database import get_db
 from driver_service.driver_service import driver_service
 from fastapi.security import OAuth2PasswordRequestForm
@@ -59,3 +59,10 @@ async def update_status(status_driver:update_status,db=Depends(get_db),user=Depe
 async def delete_driver(db=Depends(get_db),user=Depends(get_user)):
      result=driver_service(db)
      return await result.delete_user(user)
+
+
+@driver_route.post('/send_email')
+async def email():
+     sender=await driver_service.mail()
+     return sender
+

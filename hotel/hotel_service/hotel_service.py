@@ -1,7 +1,7 @@
 from hotel_utils.hotel_utils import hash_password,verify_password,get_user
 from sqlalchemy.future import select
 from fastapi import HTTPException, status,Depends
-from hotel_models.hotel_models import hotel_model,update_location_model,category_model,food_item_model,Orderrequest
+from hotel_models.hotel_models import hotel_model,update_location_model,category_model,food_item_model,Orderrequest,update_pass
 from hotel_schema.hotel_schema import hotel_details,category_details,food_item_details
 from sqlalchemy import text
 class Hotelservice:
@@ -181,3 +181,15 @@ class Hotelservice:
             "hotel_id":delt.id,
             'message':'driver account deleted'
         }
+    
+    async def updatePass(self,updatepass:update_pass):
+        use_r= await self.db.execute(select(hotel_details).where(hotel_details.id==updatepass.hotel_id,hotel_details.hotel_delete == False))
+        hotel=use_r.scalar_one_or_none()
+        if not hotel:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,detail='user not found')
+        passw=hash_password(updatepass.password)
+
+        hotel.hotel_password=passw
+        await self.db.commit()
+        return {'message':'password updated'}
