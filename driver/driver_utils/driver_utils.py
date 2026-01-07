@@ -1,6 +1,6 @@
 from passlib.context import CryptContext
 from jose import jwt,JWTError
-from datetime import datetime,timedelta
+from datetime import datetime,timedelta,timezone
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import Depends,HTTPException,status
 from database import get_db
@@ -22,7 +22,7 @@ def verify_password(plain_password:str,hashed_password:str)->bool:
 
 async def token(data:dict):
     encode_=data.copy()
-    exp=datetime.utcnow()+timedelta(minutes=min_token)
+    exp = datetime.now(timezone.utc) + timedelta(minutes=min_token)
     encode_.update({'exp':exp})
     return jwt.encode(encode_,SECRET_KEY,algorithm=ALGORITHM)
 
@@ -39,6 +39,6 @@ async def get_user(token:str=Depends(oauth),db=Depends(get_db)):
 
     except JWTError:
         raise credentials_exception
-    current_user=await db.execute(select(driver_details).where(driver_details.driver_name==driver_name))
-    user = current_user.scalar_one_or_none()
-    return user
+    current_user=await db.scalar(select(driver_details).where(driver_details.driver_name==driver_name))
+ 
+    return current_user
