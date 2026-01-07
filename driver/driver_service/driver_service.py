@@ -2,7 +2,7 @@ from driver_utils.driver_utils import hash_password,verify_password,get_user
 from fastapi import Depends
 from sqlalchemy.future import select
 from fastapi import HTTPException, status
-from driver_models.driver_model import drive_model,update_location_model,orderrequest,send_email
+from driver_models.driver_model import drive_model,update_location_model,orderrequest,send_email,update_status
 from driver_schema.driver_sechema import driver_details
 from sqlalchemy import text
 import smtplib
